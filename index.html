@@ -677,63 +677,103 @@ const rgb=h=>[1,3,5].map(i=>parseInt(h.slice(i,i+2),16));
 const pt=v=>typeof v==="string"?v.replace(/≥/g,">=").replace(/≤/g,"<=").replace(/[^\x00-\xFF—–…•“”‘’]/g,""):v;
 function buildPDF(){
   const {jsPDF}=window.jspdf;const doc=new jsPDF({orientation:"landscape",unit:"pt",format:"letter"});
-  const W=792,H=612,M=36,e=S.empresa,INK=[28,25,22],MUT=[106,97,87],COP=[166,90,39],LINE=[219,209,194];
-  let page=0;
-  const head=(title)=>{page++;
+  const W=792,H=612,M=36,e=S.empresa,INK=[28,25,22],MUT=[106,97,87],COP=[166,90,39],LINE=[219,209,194],DARK=[46,41,37],BONE=[239,232,220];
+  const OKC=[214,234,219],MISSC=[244,214,205],NAC=[237,233,226];
+  const head=(title)=>{
     if(e.logo){try{const bw=110,bh=36,k=Math.min(bw/(e.logoW||bw),bh/(e.logoH||bh));doc.addImage(e.logo,"PNG",M,20,(e.logoW||bw)*k,(e.logoH||bh)*k,"custlogo","FAST")}catch(err){}}
     else{try{doc.addImage(PS_LOGO,"PNG",M,17,74,42.2,"pslogo","FAST")}catch(err){}}
-    doc.setFont("helvetica","bold");doc.setFontSize(15);doc.setTextColor(...INK);doc.text(title,M+140,38);
+    doc.setFont("helvetica","bold");doc.setFontSize(15);doc.setTextColor(...INK);doc.text(pt(title),M+140,38,{maxWidth:W-2*M-140});
     doc.setFont("helvetica","normal");doc.setFontSize(9);doc.setTextColor(...MUT);doc.text([e.nombre,`Versión ${e.version||"1"}`,e.fecha,e.elaboro?"Elaboró: "+e.elaboro:""].filter(Boolean).join("   |   "),M+140,52,{maxWidth:W-2*M-140});
     doc.setDrawColor(...LINE);doc.setLineWidth(.6);doc.line(M,64,W-M,64)};
-  const foot=()=>{doc.setFont("helvetica","normal");doc.setFontSize(8);doc.setTextColor(...MUT);doc.text(`${e.nombre} · Mapa de procesos y actividades`,M,H-22);doc.text(`Página ${page}`,W-M,H-22,{align:"right"})};
+  const TB={font:"helvetica",textColor:INK,lineColor:LINE,lineWidth:.5,overflow:"linebreak"};
+  const HS={fillColor:DARK,textColor:BONE,fontStyle:"bold",valign:"middle"};
+  // tabla que puede ocupar varias páginas: encabezado en cada hoja y renglones sin partir
+  const table=(title,opts,startY)=>{if(startY==null){doc.addPage();startY=76}let first=true;
+    doc.autoTable({...opts,startY,margin:{top:76,left:M,right:M,bottom:46},rowPageBreak:"avoid",showHead:"everyPage",
+      didDrawPage:()=>{if(!(first&&startY>76))head(first?title:title+" (continuación)");first=false}});
+    return doc.lastAutoTable.finalY};
   // mapa
   head("Mapa de procesos");
   const top=80,bottom=H-50,sideW=92,gap=10,bx=M+sideW+gap,bw=W-2*M-2*(sideW+gap);
-  const side=(x,t,txt)=>{doc.setFillColor(46,41,37);doc.roundedRect(x,top,sideW,bottom-top,7,7,"F");doc.setTextColor(239,232,220);doc.setFont("helvetica","bold");doc.setFontSize(12);doc.text(t,x+sideW/2,(top+bottom)/2-22,{align:"center"});doc.setFont("helvetica","normal");doc.setFontSize(8);doc.text(doc.splitTextToSize(txt||"",sideW-14).slice(0,14),x+sideW/2,(top+bottom)/2-6,{align:"center"})};
+  const side=(x,t,txt)=>{doc.setFillColor(...DARK);doc.roundedRect(x,top,sideW,bottom-top,7,7,"F");doc.setTextColor(...BONE);doc.setFont("helvetica","bold");doc.setFontSize(12);doc.text(t,x+sideW/2,(top+bottom)/2-22,{align:"center"});doc.setFont("helvetica","normal");doc.setFontSize(8);doc.text(doc.splitTextToSize(pt(txt||""),sideW-14).slice(0,14),x+sideW/2,(top+bottom)/2-6,{align:"center"})};
   side(M,"Entradas",e.entradas);side(W-M-sideW,"Salidas",e.salidas);
   const bh=(bottom-top-gap*2)/3;
   TYPES.forEach((t,bi)=>{const y=top+bi*(bh+gap);doc.setFillColor(237,230,218);doc.roundedRect(bx,y,bw,bh,7,7,"F");
     doc.setFillColor(...rgb(t.pdf[0]));doc.roundedRect(bx+10,y+9,8,8,2,2,"F");doc.setFont("helvetica","bold");doc.setFontSize(8.5);doc.setTextColor(...MUT);doc.text(("Procesos "+t.label).toUpperCase(),bx+24,y+16);
     const ps=procsOf(t.id);if(!ps.length)return;const per=Math.min(ps.length,6),rows=Math.ceil(ps.length/per),ty=y+24,th=Math.min(64,(bh-30-(rows-1)*6)/rows),tw=(bw-20-(per-1)*12)/per;
     ps.forEach((p,i)=>{const r=Math.floor(i/per),k=i%per,x=bx+10+k*(tw+12),yy=ty+r*(th+6);doc.setFillColor(...rgb(t.pdf[0]));doc.roundedRect(x,yy,tw,th,5,5,"F");doc.setTextColor(...rgb(t.pdf[1]));
-      doc.setFont("helvetica","bold");doc.setFontSize(8.5);const tl=doc.splitTextToSize(p.nombre,tw-10).slice(0,2);doc.text(tl,x+tw/2,yy+th/2-(tl.length-1)*5-1,{align:"center"});
-      doc.setFont("helvetica","normal");doc.setFontSize(6.8);doc.text(`${p.resp||"sin responsable"} · ${p.actividades.length} act.`,x+tw/2,yy+th/2+(tl.length)*5+4,{align:"center",maxWidth:tw-8});
+      doc.setFont("helvetica","bold");doc.setFontSize(8.5);const tl=doc.splitTextToSize(pt(p.nombre),tw-10).slice(0,2);doc.text(tl,x+tw/2,yy+th/2-(tl.length-1)*5-1,{align:"center"});
+      doc.setFont("helvetica","normal");doc.setFontSize(6.8);doc.text(pt(`${p.resp||"sin responsable"} · ${p.actividades.length} act.`),x+tw/2,yy+th/2+(tl.length)*5+4,{align:"center",maxWidth:tw-8});
       if(t.id==="operativo"&&k<per-1&&i<ps.length-1){doc.setFillColor(...COP);doc.triangle(x+tw+3,yy+th/2-4,x+tw+3,yy+th/2+4,x+tw+9,yy+th/2,"F")}})});
-  foot();
   // fichas + actividades
   ordered().forEach(p=>{doc.addPage();head("Ficha de proceso");const c=p.car,t=typeOf(p.tipo);
     const gx=M,gy=76,gw=W-2*M,cw=(gw-20)/3,ch=136;
-    const box=(col,row,title,arr,fill)=>{const x=gx+col*(cw+10),y=gy+row*(ch+10);
+    const box=(col,row,title,arr,fill,more)=>{const x=gx+col*(cw+10),y=gy+row*(ch+10);
       if(fill){doc.setFillColor(...rgb(fill[0]));doc.roundedRect(x,y,cw,ch,7,7,"F")}else{doc.setDrawColor(...LINE);doc.setFillColor(255,255,255);doc.roundedRect(x,y,cw,ch,7,7,"FD")}
-      doc.setTextColor(...(fill?rgb(fill[1]):MUT));doc.setFont("helvetica","bold");doc.setFontSize(8.5);doc.text(title.toUpperCase(),x+10,y+16,{maxWidth:cw-20});
+      doc.setTextColor(...(fill?rgb(fill[1]):MUT));doc.setFont("helvetica","bold");doc.setFontSize(8.5);doc.text(pt(title).toUpperCase(),x+10,y+16,{maxWidth:cw-20});
       doc.setFont("helvetica","normal");doc.setFontSize(8.5);if(!fill)doc.setTextColor(...INK);let ls=[];(arr||[]).forEach(l=>{ls=ls.concat(doc.splitTextToSize(pt(l),cw-20))});
-      const max=Math.floor((ch-28)/10.5);if(!ls.length){doc.setTextColor(160,152,142);ls=["Sin capturar"]}if(ls.length>max){ls=ls.slice(0,max);ls[max-1]=ls[max-1].replace(/.{0,2}$/,"…")}doc.text(ls,x+10,y+30)};
+      const max=Math.floor((ch-28)/10.5);if(!ls.length){doc.setTextColor(160,152,142);ls=["Sin capturar"]}if(ls.length>max){ls=ls.slice(0,max);ls[max-1]=more||"…"}doc.text(ls,x+10,y+30)};
     const bl=s=>lines(s).map(x=>"• "+x);
-    box(0,0,"Recursos",bl(c.recursos));box(1,0,"Actividades principales",p.actividades.map(a=>"• "+a.actividad));box(2,0,"Indicadores",bl(c.indicadores));
+    box(0,0,"Recursos",bl(c.recursos));box(1,0,"Actividades principales",p.actividades.map(a=>"• "+a.actividad),null,`… ver las ${p.actividades.length} actividades en la tabla`);box(2,0,"Indicadores",bl(c.indicadores));
     box(0,1,"Proveedores y entradas",[...(lines(c.proveedores).length?["Proveedores:",...bl(c.proveedores)]:[]),"Entradas:",...bl(c.entradas)]);
     box(1,1,p.nombre,[`Proceso ${t.sing}`,c.objetivo?"Objetivo: "+c.objetivo:"",(c.inicio||c.fin)?`Inicia con: ${c.inicio||"…"}. Termina con: ${c.fin||"…"}.`:"","Responsable: "+(p.resp||"sin asignar"),"Respaldo: "+(p.resp2||"sin asignar")].filter(Boolean),t.pdf);
     box(2,1,"Salidas y clientes",["Salidas:",...bl(c.salidas),...(lines(c.clientes).length?["Clientes:",...bl(c.clientes)]:[])]);
     box(0,2,"Riesgos",bl(c.riesgos));box(1,2,"Requisitos aplicables",bl(c.requisitos));box(2,2,"Documentos y registros",bl(c.documentos));
-    const y2=gy+3*(ch+10);doc.setFont("helvetica","bold");doc.setFontSize(8.5);doc.setTextColor(...MUT);doc.text("Interacción:",M,y2+4);doc.setFont("helvetica","normal");doc.setTextColor(...INK);doc.text(doc.splitTextToSize(lines(c.interaccion).join(", ")||"Sin capturar",W-2*M-70).slice(0,2),M+62,y2+4);
-    foot();
-    if(p.actividades.length&&doc.autoTable){doc.addPage();head(`Actividades · ${p.nombre}`);
-      doc.autoTable({startY:76,margin:{left:M,right:M,bottom:40},head:[["#","Actividad","Responsable","Frecuencia","H/mes","Entregable o evidencia","Herramienta o documento","Indicador","Meta","Notas"]],body:p.actividades.map((a,i)=>[i+1,a.actividad,a.responsable,a.frecuencia,a.horas,a.entregable,a.herramienta,a.indicador,a.meta,a.notas].map(pt)),
-        styles:{font:"helvetica",fontSize:7.8,cellPadding:4,textColor:INK,lineColor:LINE,lineWidth:.5,valign:"top"},headStyles:{fillColor:[46,41,37],textColor:[239,232,220],fontStyle:"bold"},alternateRowStyles:{fillColor:[247,243,236]},
-        columnStyles:{0:{cellWidth:18,halign:"right"},1:{cellWidth:140},2:{cellWidth:62},3:{cellWidth:54},4:{cellWidth:34,halign:"right"},8:{cellWidth:44}},didDrawPage:()=>{}});
-      foot()}});
-  // resumen
-  if(doc.autoTable){doc.addPage();head("Quién hace qué");const acts=allActs();
-    doc.autoTable({startY:76,margin:{left:M,right:M,bottom:40},head:[["Responsable","Procesos que lidera","Respaldo de","Actividades","Horas al mes"]],body:equipoAll().filter(r=>S.procesos.some(p=>p.resp===r||p.resp2===r)||acts.some(x=>x.a.responsable===r)).map(r=>{const ma=acts.filter(x=>x.a.responsable===r);return [r,S.procesos.filter(p=>p.resp===r).map(p=>p.nombre).join(", ")||"—",S.procesos.filter(p=>p.resp2===r).map(p=>p.nombre).join(", ")||"—",ma.length,fmtH(ma.reduce((t,x)=>t+hrs(x.a),0))]}),
-      styles:{font:"helvetica",fontSize:9,cellPadding:6,textColor:INK,lineColor:LINE,lineWidth:.5},headStyles:{fillColor:[46,41,37],textColor:[239,232,220]},columnStyles:{0:{cellWidth:110,fontStyle:"bold"},3:{cellWidth:62,halign:"right"},4:{cellWidth:62,halign:"right"}}});
-    foot();
+    const y2=gy+3*(ch+10);doc.setFont("helvetica","bold");doc.setFontSize(8.5);doc.setTextColor(...MUT);doc.text("Interacción:",M,y2+4);doc.setFont("helvetica","normal");doc.setTextColor(...INK);doc.text(doc.splitTextToSize(pt(lines(c.interaccion).join(", ")||"Sin capturar"),W-2*M-70).slice(0,2),M+62,y2+4);
+    if(p.actividades.length&&doc.autoTable){
+      table(`Actividades · ${p.nombre}`,{head:[["#","Actividad","Responsable","Frecuencia","H/mes","Entregable o evidencia","Herramienta o documento","Indicador","Meta","Notas"]],
+        body:p.actividades.map((a,i)=>[i+1,a.actividad,a.responsable,a.frecuencia,a.horas,a.entregable,a.herramienta,a.indicador,a.meta,a.notas].map(pt)),
+        styles:{...TB,fontSize:7.6,cellPadding:4,valign:"top"},headStyles:{...HS,fontSize:7.4},alternateRowStyles:{fillColor:[247,243,236]},
+        columnStyles:{0:{cellWidth:18,halign:"right"},1:{cellWidth:150},2:{cellWidth:62},3:{cellWidth:52},4:{cellWidth:30,halign:"right"},5:{cellWidth:92},6:{cellWidth:82},7:{cellWidth:92},8:{cellWidth:40},9:{cellWidth:102}}})}});
+  if(doc.autoTable){
+    // quién hace qué
+    const acts=allActs();
+    table("Quién hace qué",{head:[["Responsable","Procesos que lidera","Respaldo de","Actividades","Horas al mes"]],
+      body:equipoAll().filter(r=>S.procesos.some(p=>p.resp===r||p.resp2===r)||acts.some(x=>x.a.responsable===r)).map(r=>{const ma=acts.filter(x=>x.a.responsable===r);return [r,S.procesos.filter(p=>p.resp===r).map(p=>p.nombre).join(", ")||"—",S.procesos.filter(p=>p.resp2===r).map(p=>p.nombre).join(", ")||"—",ma.length,fmtH(ma.reduce((t,x)=>t+hrs(x.a),0))].map(pt)}),
+      styles:{...TB,fontSize:9,cellPadding:6},headStyles:HS,columnStyles:{0:{cellWidth:110,fontStyle:"bold"},1:{cellWidth:260},2:{cellWidth:226},3:{cellWidth:62,halign:"right"},4:{cellWidth:62,halign:"right"}}});
+    // resultados por año
     const ind=acts.filter(x=>x.a.indicador.trim());const yrs=[...new Set(ind.flatMap(({a})=>Object.keys(a.resultados).map(k=>+k.slice(0,4))))].sort((a,b)=>a-b);
-    yrs.forEach(y=>{const rowsY=ind.filter(({a})=>Object.keys(a.resultados).some(k=>k.startsWith(y+"-")));if(!rowsY.length)return;doc.addPage();head(`Resultados de indicadores ${y}`);
-      doc.autoTable({startY:76,margin:{left:M,right:M,bottom:40},head:[["Proceso","Indicador y actividad","Meta",...MESES,"Cumple"]],
+    yrs.forEach(y=>{const rowsY=ind.filter(({a})=>Object.keys(a.resultados).some(k=>k.startsWith(y+"-")));if(!rowsY.length)return;
+      table(`Resultados de indicadores ${y}`,{head:[["Proceso","Indicador y actividad","Meta",...MESES,"Cumple"]],
         body:rowsY.map(({p,a})=>{const c=cumple(a,y);return [p.nombre,a.indicador+"\n"+a.actividad,a.meta,...MESES.map((m,i)=>a.resultados[y+"-"+pad2(i+1)]||""),c.n?`${c.ok} de ${c.n}`:"—"].map(pt)}),
-        styles:{font:"helvetica",fontSize:7,cellPadding:3,textColor:INK,lineColor:LINE,lineWidth:.5,valign:"middle"},headStyles:{fillColor:[46,41,37],textColor:[239,232,220],fontStyle:"bold",halign:"center"},
-        columnStyles:{0:{cellWidth:72},1:{cellWidth:150},2:{cellWidth:40},15:{cellWidth:40,halign:"right"}},
-        didParseCell:d=>{if(d.section!=="body")return;const ci=d.column.index;if(ci>=3&&ci<=14){d.cell.styles.halign="right";const {a}=rowsY[d.row.index];const r=evalRes(a.meta,a.resultados[y+"-"+pad2(ci-2)]);if(r==="ok")d.cell.styles.fillColor=[214,234,219];else if(r==="miss")d.cell.styles.fillColor=[244,214,205]}}});
-      foot()})}
+        styles:{...TB,fontSize:7,cellPadding:3,valign:"middle"},headStyles:{...HS,halign:"center"},
+        columnStyles:{0:{cellWidth:76},1:{cellWidth:166},2:{cellWidth:42},...Object.fromEntries(MESES.map((m,i)=>[i+3,{cellWidth:33,halign:"right"}])),15:{cellWidth:40,halign:"right"}},
+        didParseCell:d=>{if(d.section!=="body")return;const ci=d.column.index;if(ci>=3&&ci<=14){const {a}=rowsY[d.row.index];const r=evalRes(a.meta,a.resultados[y+"-"+pad2(ci-2)]);if(r==="ok")d.cell.styles.fillColor=OKC;else if(r==="miss")d.cell.styles.fillColor=MISSC}}})});
+    // tablero de indicadores al día de hoy
+    const now=new Date(),ym=now.getFullYear()+"-"+pad2(now.getMonth()+1),yr=now.getFullYear();
+    const mesTxt=k=>MESES_L[+k.slice(5)-1]+" "+k.slice(0,4);
+    const rows=ind.map(({p,a})=>{const ks=Object.keys(a.resultados).filter(k=>k<=ym).sort();const last=ks[ks.length-1],prev=ks[ks.length-2];
+      const st=last?evalRes(a.meta,a.resultados[last]):"";const lv=last?num(a.resultados[last]):NaN,pv=prev?num(a.resultados[prev]):NaN;
+      const tend=isNaN(lv)||isNaN(pv)?"—":lv>pv?"Sube":lv<pv?"Baja":"Igual";const c=cumple(a,yr);
+      return {p,a,last,st,tend,c,estado:!last?"Sin dato":st==="ok"?"Cumple":st==="miss"?"No cumple":"Sin evaluar"}});
+    doc.addPage();head("Tablero de indicadores");
+    doc.setFont("helvetica","normal");doc.setFontSize(9.5);doc.setTextColor(...MUT);
+    doc.text(`Corte al ${now.getDate()} de ${MESES_L[now.getMonth()]} de ${yr}. Se toma el último resultado capturado de cada indicador hasta ${MESES_L[now.getMonth()]} de ${yr}.`,M,84);
+    if(!rows.length){doc.setFontSize(11);doc.setTextColor(...INK);doc.text("No hay actividades con indicador. Agrégalos en el paso 4 y captura sus resultados en el paso 6.",M,120)}
+    else{
+      const nOk=rows.filter(r=>r.estado==="Cumple").length,nMiss=rows.filter(r=>r.estado==="No cumple").length,nNa=rows.length-nOk-nMiss;
+      const tOk=rows.reduce((t,r)=>t+r.c.ok,0),tN=rows.reduce((t,r)=>t+r.c.n,0);
+      const kpis=[["Indicadores",String(rows.length),null],["Cumplen (último dato)",String(nOk),OKC],["No cumplen (último dato)",String(nMiss),MISSC],["Sin dato o sin meta numérica",String(nNa),NAC],[`Meses que cumplen en ${yr}`,tN?`${Math.round(tOk/tN*100)}%`:"—",null]];
+      const kw=(W-2*M-4*10)/5;
+      kpis.forEach(([l,v,fill],i)=>{const x=M+i*(kw+10),y=96;if(fill){doc.setFillColor(...fill);doc.roundedRect(x,y,kw,58,6,6,"F")}else{doc.setDrawColor(...LINE);doc.setFillColor(255,255,255);doc.roundedRect(x,y,kw,58,6,6,"FD")}
+        doc.setFont("helvetica","bold");doc.setFontSize(20);doc.setTextColor(...INK);doc.text(v,x+12,y+28);doc.setFont("helvetica","normal");doc.setFontSize(8.5);doc.setTextColor(...MUT);doc.text(l,x+12,y+46,{maxWidth:kw-20})});
+      // cumplimiento por proceso
+      let y=176;doc.setFont("helvetica","bold");doc.setFontSize(8.5);doc.setTextColor(...MUT);doc.text(`CUMPLIMIENTO POR PROCESO EN ${yr} (MESES QUE CUMPLEN / MESES EVALUADOS)`,M,y);y+=10;
+      const procs=ordered().filter(p=>rows.some(r=>r.p===p));const lw=170,tw2=W-2*M-lw-90;
+      procs.forEach(p=>{const rr=rows.filter(r=>r.p===p),ok=rr.reduce((t,r)=>t+r.c.ok,0),n=rr.reduce((t,r)=>t+r.c.n,0);
+        doc.setFont("helvetica","normal");doc.setFontSize(8.5);doc.setTextColor(...INK);doc.text(doc.splitTextToSize(pt(p.nombre),lw-10)[0],M,y+9);
+        doc.setFillColor(...NAC);doc.roundedRect(M+lw,y+2,tw2,9,2,2,"F");if(n){const f=ok/n;if(f>0){doc.setFillColor(...COP);doc.roundedRect(M+lw,y+2,Math.max(4,tw2*f),9,2,2,"F")}}
+        doc.setTextColor(...MUT);doc.text(n?`${Math.round(ok/n*100)}%  (${ok} de ${n})`:"sin evaluar",M+lw+tw2+8,y+9);y+=15});
+      y+=10;
+      const ST={Cumple:OKC,"No cumple":MISSC};
+      table("Tablero de indicadores",{head:[["Proceso","Indicador","Actividad","Responsable","Meta","Último resultado","Mes","Estado","Tendencia",`Cumple ${yr}`]],
+        body:rows.map(r=>[r.p.nombre,r.a.indicador,r.a.actividad,r.a.responsable,r.a.meta,r.last?r.a.resultados[r.last]:"—",r.last?mesTxt(r.last):"—",r.estado,r.tend,r.c.n?`${r.c.ok} de ${r.c.n} (${Math.round(r.c.ok/r.c.n*100)}%)`:"—"].map(pt)),
+        styles:{...TB,fontSize:7.8,cellPadding:4,valign:"middle"},headStyles:{...HS,fontSize:7.6},
+        columnStyles:{0:{cellWidth:78},1:{cellWidth:130},2:{cellWidth:132},3:{cellWidth:66},4:{cellWidth:44},5:{cellWidth:48,halign:"right"},6:{cellWidth:62},7:{cellWidth:58},8:{cellWidth:48},9:{cellWidth:54,halign:"right"}},
+        didParseCell:d=>{if(d.section==="body"&&d.column.index===7){d.cell.styles.fillColor=ST[d.cell.raw]||NAC;d.cell.styles.fontStyle="bold"}}},y>H-120?null:y)}
+  }
+  // pies de página con número de página
+  const n=doc.getNumberOfPages();for(let i=1;i<=n;i++){doc.setPage(i);doc.setFont("helvetica","normal");doc.setFontSize(8);doc.setTextColor(...MUT);doc.text(pt(`${e.nombre} · Mapa de procesos y actividades`),M,H-22);doc.text(`Página ${i} de ${n}`,W-M,H-22,{align:"right"})}
   return doc}
 $("#bPdf").onclick=()=>{if(!window.jspdf){toast("No se pudo cargar el generador de PDF. Recarga la página.");return}if(!S.procesos.length){toast("Agrega procesos antes de exportar.");return}
   try{const doc=buildPDF();offer(fname("pdf"),doc.output("blob"),"PDF")}catch(e){toast("No se pudo generar el PDF.")}};
