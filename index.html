@@ -290,7 +290,7 @@ function modal({title,text,options}){return new Promise(res=>{const ov=document.
 
 /* ---------- estado ---------- */
 function blank(keep){return {empresa:{nombre:"Perra Suerte S.A. de C.V.",elaboro:"",version:"1",fecha:today(),entradas:"",salidas:"",...(keep||{})},equipo:["Mauricio","Edgar","Fer","Pablo","Todos los socios"],procesos:[]}}
-function mk(tipo,nombre,resp,car){return {id:uid("p"),tipo,nombre,resp:resp||"",car:car||{},actividades:[]}}
+function mk(tipo,nombre,resp,car){return {id:uid("p"),tipo,nombre,resp:resp||"",resp2:"",car:car||{},actividades:[]}}
 function base(){
   const s=blank();s.base=true;
   s.empresa.entradas="Agave y destilado de los maestros, pedidos de clientes y distribuidores, requisitos legales y de inversionistas";
@@ -310,14 +310,14 @@ function sanitize(s){
   s=s&&typeof s==="object"?s:blank();
   s.empresa=Object.assign(blank().empresa,s.empresa||{});
   s.equipo=Array.isArray(s.equipo)?s.equipo.map(String).filter(Boolean):blank().equipo;
-  s.procesos=(Array.isArray(s.procesos)?s.procesos:[]).filter(p=>p&&p.nombre).map(p=>({id:p.id||uid("p"),tipo:TYPES.some(t=>t.id===p.tipo)?p.tipo:"operativo",nombre:String(p.nombre),resp:String(p.resp||""),
+  s.procesos=(Array.isArray(s.procesos)?s.procesos:[]).filter(p=>p&&p.nombre).map(p=>({id:p.id||uid("p"),tipo:TYPES.some(t=>t.id===p.tipo)?p.tipo:"operativo",nombre:String(p.nombre),resp:String(p.resp||""),resp2:String(p.resp2||""),
     car:Object.fromEntries(CAR_KEYS.map(k=>[k,String((p.car||{})[k]||"")])),
     actividades:(Array.isArray(p.actividades)?p.actividades:[]).filter(a=>a&&a.actividad).map(a=>({id:a.id||uid("a"),actividad:String(a.actividad),responsable:String(a.responsable||""),frecuencia:String(a.frecuencia||""),entregable:String(a.entregable||""),herramienta:String(a.herramienta||""),notas:String(a.notas||"")}))}));
   return s}
 const procsOf=t=>S.procesos.filter(p=>p.tipo===t);
 const ordered=()=>TYPES.flatMap(t=>procsOf(t.id));
 function status(p){const c=p.car;const req=["objetivo","entradas","salidas"];const n=req.filter(k=>(c[k]||"").trim()).length+(p.resp.trim()?1:0);const any=CAR_KEYS.some(k=>(c[k]||"").trim());return n===4?"ok":(any||p.resp)?"mid":""}
-function equipoAll(){const set=new Set(S.equipo);S.procesos.forEach(p=>{if(p.resp)set.add(p.resp);p.actividades.forEach(a=>a.responsable&&set.add(a.responsable))});return [...set]}
+function equipoAll(){const set=new Set(S.equipo);S.procesos.forEach(p=>{if(p.resp)set.add(p.resp);if(p.resp2)set.add(p.resp2);p.actividades.forEach(a=>a.responsable&&set.add(a.responsable))});return [...set]}
 function datalists(){return `<datalist id="dlEquipo">${equipoAll().map(n=>`<option value="${esc(n)}">`).join("")}</datalist><datalist id="dlFreq">${FREQ.map(n=>`<option value="${esc(n)}">`).join("")}</datalist>`}
 function tip(t){return `<div class="tip"><div><b>Consejo.</b> ${esc(t)}</div></div>`}
 
@@ -399,7 +399,7 @@ function vFichas(){
   $("#view").innerHTML=`<h1>Fichas de proceso</h1><p class="lead">Elige un proceso. Para darlo por completo basta con responsable, objetivo, entradas y salidas. Las actividades se capturan en el paso 4.</p>${datalists()}
   <div class="carlayout"><nav class="plnav" aria-label="Procesos">${procNav("car")}</nav>
   <div class="carform"><h2>${esc(p.nombre)}</h2><p class="sub">Proceso ${t.sing} · ${p.actividades.length} actividades</p>
-   <div class="grid2"><div class="field full"><label for="c-resp">Responsable del proceso</label><span class="help">Quien responde por el proceso, aunque varias personas hagan actividades.</span><input type="text" id="c-resp" list="dlEquipo" value="${esc(p.resp)}"></div></div>
+   <div class="grid2"><div class="field"><label for="c-resp">Responsable del proceso</label><span class="help">Quien responde por el proceso.</span><input type="text" id="c-resp" list="dlEquipo" value="${esc(p.resp)}"></div><div class="field"><label for="c-resp2">Responsable de respaldo</label><span class="help">Quien cubre el proceso cuando el responsable no está.</span><input type="text" id="c-resp2" list="dlEquipo" value="${esc(p.resp2)}" placeholder="Sin asignar"></div></div>
    ${html}
    <div class="navrow"><button class="btn" type="button" id="prevP" ${idx===0?"disabled":""}>Proceso anterior</button><div class="btnrow"><button class="btn" type="button" id="goAct">Ver actividades</button><button class="btn primary" type="button" id="nextP" ${idx===order.length-1?"disabled":""}>Siguiente proceso</button></div></div></div></div>
   ${tip("Un buen objetivo dice para qué existe el proceso. “Vender raicilla” describe una actividad; “Colocar cada lote en cuentas que cuiden la marca” describe un propósito.")}
@@ -407,7 +407,7 @@ function vFichas(){
   const dot=()=>{const d=$(`.plnav button[data-id="${p.id}"] .st`);if(d)d.className="st "+status(p)};
   $("#view").querySelectorAll(".plnav button").forEach(b=>b.onclick=()=>{selected=b.dataset.id;save();vFichas();$(".carform").scrollIntoView({behavior:"smooth",block:"start"})});
   $("#view").querySelectorAll("[data-c]").forEach(el=>el.oninput=()=>{c[el.dataset.c]=el.value;save();dot()});
-  $("#c-resp").oninput=e=>{p.resp=e.target.value;save();dot()};
+  $("#c-resp").oninput=e=>{p.resp=e.target.value;save();dot()};$("#c-resp2").oninput=e=>{p.resp2=e.target.value;save()};
   $("#prevP").onclick=()=>{selected=order[idx-1].id;save();vFichas()};$("#nextP").onclick=()=>{selected=order[idx+1].id;save();vFichas()};
   $("#goAct").onclick=()=>go(3);$("#prev").onclick=()=>go(1);$("#next").onclick=()=>go(3);
 }
@@ -418,7 +418,7 @@ function vActividades(){
   const p=ensureSel(),order=ordered(),idx=order.indexOf(p);
   $("#view").innerHTML=`<h1>Actividades por proceso</h1><p class="lead">Registra cada actividad que hoy se hace en el proceso, quién la hace, cada cuándo y qué deja como evidencia. Así queda claro qué le toca a cada quien.</p>${datalists()}
   <div class="carlayout"><nav class="plnav" aria-label="Procesos">${procNav("act")}</nav>
-  <div class="carform"><h2>${esc(p.nombre)}</h2><p class="sub">Responsable del proceso: ${p.resp?esc(p.resp):"sin asignar"}</p>
+  <div class="carform"><h2>${esc(p.nombre)}</h2><p class="sub">Responsable del proceso: ${p.resp?esc(p.resp):"sin asignar"} · Respaldo: ${p.resp2?esc(p.resp2):"sin asignar"}</p>
    <div class="acts" id="acts"></div>
    <form class="addact" id="addAct"><label class="sr" for="newAct">Nueva actividad</label><input type="text" id="newAct" placeholder="Describe la actividad, por ejemplo: Confirmar con el maestro el volumen del siguiente lote"><button class="btn primary" type="submit">Agregar</button></form>
    <div class="navrow"><button class="btn" type="button" id="prevP" ${idx===0?"disabled":""}>Proceso anterior</button><button class="btn" type="button" id="nextP" ${idx===order.length-1?"disabled":""}>Siguiente proceso</button></div></div></div>
@@ -460,15 +460,15 @@ function mapHTML(){
 function allActs(){return ordered().flatMap(p=>p.actividades.map(a=>({p,a})))}
 function vMapa(){
   if(viewProc)return vFicha(viewProc);
-  const e=S.empresa,acts=allActs(),resp=equipoAll().filter(r=>S.procesos.some(p=>p.resp===r)||acts.some(x=>x.a.responsable===r));
+  const e=S.empresa,acts=allActs(),resp=equipoAll().filter(r=>S.procesos.some(p=>p.resp===r||p.resp2===r)||acts.some(x=>x.a.responsable===r));
   const sinResp=acts.filter(x=>!x.a.responsable).length,fichas=S.procesos.filter(p=>status(p)==="ok").length;
-  const rows=resp.map(r=>{const lp=S.procesos.filter(p=>p.resp===r);const n=acts.filter(x=>x.a.responsable===r).length;return `<tr><td><b>${esc(r)}</b></td><td>${lp.map(p=>esc(p.nombre)).join(", ")||"—"}</td><td class="num">${n}</td></tr>`}).join("");
+  const rows=resp.map(r=>{const lp=S.procesos.filter(p=>p.resp===r);const n=acts.filter(x=>x.a.responsable===r).length;const lb=S.procesos.filter(p=>p.resp2===r);return `<tr><td><b>${esc(r)}</b></td><td>${lp.map(p=>esc(p.nombre)).join(", ")||"—"}</td><td>${lb.map(p=>esc(p.nombre)).join(", ")||"—"}</td><td class="num">${n}</td></tr>`}).join("");
   $("#view").innerHTML=`${S.base&&!acts.length?`<div class="banner"><span><b>Mapa base cargado.</b> Trae el reparto de procesos por socio. Ajústalo en Procesos y agrega actividades en el paso 4, o carga tu Excel.</span></div>`:""}
   <div class="carhead"><div><h1>${esc(e.nombre||"Mapa de procesos")}</h1><p class="lead" style="margin:0">Versión ${esc(e.version||"1")} · ${esc(e.fecha||"")}${e.elaboro?` · Elaboró ${esc(e.elaboro)}`:""}</p></div></div>
   <p class="help" style="margin:0 0 12px">Haz clic en un proceso para ver su ficha y sus actividades.</p>${mapHTML()}
   <div class="summary"><div class="stat"><b>${S.procesos.length}</b><span>procesos</span></div><div class="stat"><b>${fichas}</b><span>fichas completas</span></div><div class="stat"><b>${acts.length}</b><span>actividades</span></div><div class="stat"><b>${sinResp}</b><span>actividades sin responsable</span></div></div>
   <div class="sec">Quién hace qué</div>
-  <div class="tablewrap"><table><thead><tr><th>Responsable</th><th>Procesos que lidera</th><th class="num">Actividades</th></tr></thead><tbody>${rows||`<tr><td colspan="3" class="empty">Asigna responsables a procesos y actividades.</td></tr>`}</tbody></table></div>
+  <div class="tablewrap"><table><thead><tr><th>Responsable</th><th>Procesos que lidera</th><th>Respaldo de</th><th class="num">Actividades</th></tr></thead><tbody>${rows||`<tr><td colspan="4" class="empty">Asigna responsables a procesos y actividades.</td></tr>`}</tbody></table></div>
   <div class="sec">Todas las actividades</div>
   <div class="filters"><label class="sr" for="fR">Filtrar por responsable</label><select id="fR"><option value="">Todos los responsables</option>${equipoAll().map(r=>`<option ${filtR===r?"selected":""}>${esc(r)}</option>`).join("")}<option value="__none" ${filtR==="__none"?"selected":""}>Sin responsable</option></select>
    <label class="sr" for="fP">Filtrar por proceso</label><select id="fP"><option value="">Todos los procesos</option>${ordered().map(p=>`<option value="${p.id}" ${filtP===p.id?"selected":""}>${esc(p.nombre)}</option>`).join("")}</select></div>
@@ -493,7 +493,7 @@ function vFicha(id){
    <div class="btnrow"><button class="btn" type="button" id="back">Volver al mapa</button><button class="btn" type="button" id="pp" ${idx===0?"disabled":""}>Anterior</button><button class="btn" type="button" id="np" ${idx===order.length-1?"disabled":""}>Siguiente</button><button class="btn" type="button" id="ed">Editar ficha</button><button class="btn" type="button" id="ea">Editar actividades</button></div></div>
   <div class="turtle">${box("Recursos",c.recursos)}<div class="tb"><h3>Actividades principales</h3>${actsL}</div>${box("Indicadores",c.indicadores)}
    <div class="tb"><h3>Proveedores y entradas</h3>${lines(c.proveedores).length?`<p><b>Proveedores</b></p>${list(c.proveedores)}`:""}<p style="margin-top:6px"><b>Entradas</b></p>${list(c.entradas)}</div>
-   <div class="tb center t-${t.id}"><h3>Proceso ${esc(t.sing)}</h3><div class="pn">${esc(p.nombre)}</div>${c.objetivo?`<p><b>Objetivo:</b> ${esc(c.objetivo)}</p>`:""}${c.inicio||c.fin?`<p><b>Inicia con:</b> ${esc(c.inicio||"…")}<br><b>Termina con:</b> ${esc(c.fin||"…")}</p>`:""}<p><b>Responsable:</b> ${esc(p.resp||"sin asignar")}</p></div>
+   <div class="tb center t-${t.id}"><h3>Proceso ${esc(t.sing)}</h3><div class="pn">${esc(p.nombre)}</div>${c.objetivo?`<p><b>Objetivo:</b> ${esc(c.objetivo)}</p>`:""}${c.inicio||c.fin?`<p><b>Inicia con:</b> ${esc(c.inicio||"…")}<br><b>Termina con:</b> ${esc(c.fin||"…")}</p>`:""}<p><b>Responsable:</b> ${esc(p.resp||"sin asignar")}<br><b>Respaldo:</b> ${esc(p.resp2||"sin asignar")}</p></div>
    <div class="tb"><h3>Salidas y clientes</h3><p><b>Salidas</b></p>${list(c.salidas)}${lines(c.clientes).length?`<p style="margin-top:6px"><b>Clientes</b></p>${list(c.clientes)}`:""}</div>
    ${box("Riesgos",c.riesgos)}${box("Requisitos aplicables",c.requisitos)}${box("Documentos y registros",c.documentos)}</div>
   <div class="carfoot"><div class="tb" style="min-height:0"><h3>Interacción con otros procesos</h3>${list(c.interaccion)}</div></div>
@@ -511,7 +511,7 @@ function mergeData(inc){
   inc.equipo.forEach(n=>{if(!S.equipo.some(x=>norm(x)===norm(n)))S.equipo.push(n)});
   inc.procesos.forEach(ip=>{let p=S.procesos.find(x=>norm(x.nombre)===norm(ip.nombre));
     if(!p){p={...ip,id:uid("p"),actividades:[]};S.procesos.push(p);r.p++}
-    else{if(!p.resp&&ip.resp){p.resp=ip.resp;r.c++}
+    else{if(!p.resp&&ip.resp){p.resp=ip.resp;r.c++}if(!p.resp2&&ip.resp2){p.resp2=ip.resp2;r.c++}
       CAR_KEYS.forEach(k=>{const cur=p.car[k]||"",nv=ip.car[k]||"";if(!nv.trim())return;if(!cur.trim()){p.car[k]=nv;r.c++;return}
         const have=new Set(lines(cur).map(norm));const add=lines(nv).filter(l=>!have.has(norm(l)));if(add.length){p.car[k]=cur.replace(/\s+$/,"")+"\n"+add.join("\n");r.c++}})}
     ip.actividades.forEach(ia=>{const a=p.actividades.find(x=>norm(x.actividad)===norm(ia.actividad));
@@ -537,11 +537,12 @@ $("#fJson").onchange=async ev=>{const f=ev.target.files[0];if(!f)return;let obj;
   const mode=await askMode(`JSON${obj.autor?" de "+obj.autor:""}`);if(mode)applyIncoming(data,mode,"JSON")};
 
 /* ---------- Excel ---------- */
-const PCOLS=[["tipo","Tipo"],["proceso","Proceso"],["resp","Responsable"],["objetivo","Objetivo"],["inicio","Inicia con"],["fin","Termina con"],["proveedores","Proveedores"],["entradas","Entradas"],["salidas","Salidas"],["clientes","Clientes"],["interaccion","Interacción con otros procesos"],["recursos","Recursos"],["indicadores","Indicadores"],["riesgos","Riesgos"],["requisitos","Requisitos aplicables"],["documentos","Documentos y registros"]];
+const PCOLS=[["tipo","Tipo"],["proceso","Proceso"],["resp","Responsable"],["resp2","Responsable de respaldo"],["objetivo","Objetivo"],["inicio","Inicia con"],["fin","Termina con"],["proveedores","Proveedores"],["entradas","Entradas"],["salidas","Salidas"],["clientes","Clientes"],["interaccion","Interacción con otros procesos"],["recursos","Recursos"],["indicadores","Indicadores"],["riesgos","Riesgos"],["requisitos","Requisitos aplicables"],["documentos","Documentos y registros"]];
 const ACOLS=[["proceso","Proceso"],["actividad","Actividad"],["responsable","Responsable"],["frecuencia","Frecuencia"],["entregable","Entregable o evidencia"],["herramienta","Herramienta o documento"],["notas","Notas"]];
 const ALIAS={
  tipo:["tipo","tipo de proceso","clasificacion","nivel","categoria"],
  proceso:["proceso","nombre del proceso","area","area proceso","proceso area"],
+ resp2:["responsable de respaldo","respaldo","suplente","responsable suplente","backup","responsable respaldo"],
  resp:["responsable","responsable del proceso","dueno","dueno del proceso","socio","socio responsable","lider"],
  objetivo:["objetivo","objetivo del proceso","proposito"],inicio:["inicia con","inicio"],fin:["termina con","fin"],
  proveedores:["proveedores"],entradas:["entradas"],salidas:["salidas"],clientes:["clientes"],interaccion:["interaccion","interaccion con otros procesos","interacciones"],
@@ -561,12 +562,12 @@ function parseWorkbook(wb){
   const get=n=>{let p=byName.get(norm(n));if(!p){p={nombre:n,tipo:"operativo",resp:"",car:{},actividades:[]};byName.set(norm(n),p);out.procesos.push(p)}return p};
   const isEx=v=>/^\(?ejemplo/i.test(v);
   wb.SheetNames.forEach(sn=>{const rows=XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,defval:"",raw:false});
-    const pk=["tipo","proceso","resp",...CAR_KEYS];const tp=findTable(rows,pk,["proceso"]);
+    const pk=["tipo","proceso","resp","resp2",...CAR_KEYS];const tp=findTable(rows,pk,["proceso"]);
     const ta=findTable(rows,["proceso","actividad","responsable","frecuencia","entregable","herramienta","notas"],["actividad"]);
     if(ta){for(let r=ta.hr+1;r<rows.length;r++){const row=rows[r],g=k=>ta.m[k]===undefined?"":cell(row[ta.m[k]]);const act=g("actividad");if(!act||isEx(act))continue;
         const pn=g("proceso")||sn;if(isEx(pn))continue;const p=get(pn);p.actividades.push({actividad:act,responsable:g("responsable"),frecuencia:g("frecuencia"),entregable:g("entregable"),herramienta:g("herramienta"),notas:g("notas")});foundA++}}
     else if(tp){for(let r=tp.hr+1;r<rows.length;r++){const row=rows[r],g=k=>tp.m[k]===undefined?"":cell(row[tp.m[k]]);const pn=g("proceso");if(!pn||isEx(pn))continue;
-        const p=get(pn);if(tp.m.tipo!==undefined)p.tipo=tipoFrom(g("tipo"));if(g("resp"))p.resp=g("resp");CAR_KEYS.forEach(k=>{if(g(k))p.car[k]=g(k).split(/\s*[;\n]\s*/).filter(Boolean).join("\n")});foundP++}}});
+        const p=get(pn);if(tp.m.tipo!==undefined)p.tipo=tipoFrom(g("tipo"));if(g("resp"))p.resp=g("resp");if(g("resp2"))p.resp2=g("resp2");CAR_KEYS.forEach(k=>{if(g(k))p.car[k]=g(k).split(/\s*[;\n]\s*/).filter(Boolean).join("\n")});foundP++}}});
   return {data:out,foundP,foundA}}
 $("#bImpXls").onclick=()=>{if(!window.XLSX){toast("No se pudo cargar el lector de Excel. Revisa tu conexión y recarga la página.");return}$("#fXls").value="";$("#fXls").click()};
 $("#fXls").onchange=async ev=>{const f=ev.target.files[0];if(!f)return;let res;
@@ -579,11 +580,11 @@ function buildWorkbook(template){
   const wsI=XLSX.utils.aoa_to_sheet(ins);wsI["!cols"]=[{wch:110}];XLSX.utils.book_append_sheet(wb,wsI,"Instrucciones");
   const tl={estrategico:"Estratégico",operativo:"Operativo",apoyo:"De apoyo"};
   let prow,arow;
-  if(template){prow=[["Operativo","(ejemplo) Comercial","Mauricio","Colocar cada lote en cuentas que cuiden la marca","Prospecto identificado","Pedido entregado y cobrado","Producción\nInsumos","Inventario disponible\nLista de precios","Pedido confirmado","Centros de consumo\nDistribuidores","Operación y logística\nFacturación y cobranza","CRM\nMuestras","Cuentas activas por mes","Cuenta que maltrata la marca","Contrato con distribuidor","Lista de precios\nPedidos"]];
+  if(template){prow=[["Operativo","(ejemplo) Comercial","Mauricio","Edgar","Colocar cada lote en cuentas que cuiden la marca","Prospecto identificado","Pedido entregado y cobrado","Producción\nInsumos","Inventario disponible\nLista de precios","Pedido confirmado","Centros de consumo\nDistribuidores","Operación y logística\nFacturación y cobranza","CRM\nMuestras","Cuentas activas por mes","Cuenta que maltrata la marca","Contrato con distribuidor","Lista de precios\nPedidos"]];
     arow=[["(ejemplo) Comercial","Visitar cuentas de la ruta y registrar visita","Mauricio","Semanal","Registro de visita en PS Campo","PS Campo","Los jueves"]];
-    S.procesos.forEach(p=>prow.push([tl[p.tipo],p.nombre,p.resp,...CAR_KEYS.map(()=>"")]));}
-  else{prow=ordered().map(p=>[tl[p.tipo],p.nombre,p.resp,...CAR_KEYS.map(k=>p.car[k]||"")]);arow=allActs().map(({p,a})=>[p.nombre,a.actividad,a.responsable,a.frecuencia,a.entregable,a.herramienta,a.notas])}
-  const wsP=XLSX.utils.aoa_to_sheet([PCOLS.map(c=>c[1]),...prow]);wsP["!cols"]=PCOLS.map((c,i)=>({wch:i<3?22:34}));wsP["!autofilter"]={ref:XLSX.utils.encode_range({s:{r:0,c:0},e:{r:Math.max(prow.length,1),c:PCOLS.length-1}})};XLSX.utils.book_append_sheet(wb,wsP,"Procesos");
+    S.procesos.forEach(p=>prow.push([tl[p.tipo],p.nombre,p.resp,p.resp2,...CAR_KEYS.map(()=>"")]));}
+  else{prow=ordered().map(p=>[tl[p.tipo],p.nombre,p.resp,p.resp2,...CAR_KEYS.map(k=>p.car[k]||"")]);arow=allActs().map(({p,a})=>[p.nombre,a.actividad,a.responsable,a.frecuencia,a.entregable,a.herramienta,a.notas])}
+  const wsP=XLSX.utils.aoa_to_sheet([PCOLS.map(c=>c[1]),...prow]);wsP["!cols"]=PCOLS.map((c,i)=>({wch:i<4?22:34}));wsP["!autofilter"]={ref:XLSX.utils.encode_range({s:{r:0,c:0},e:{r:Math.max(prow.length,1),c:PCOLS.length-1}})};XLSX.utils.book_append_sheet(wb,wsP,"Procesos");
   const wsA=XLSX.utils.aoa_to_sheet([ACOLS.map(c=>c[1]),...arow]);wsA["!cols"]=[{wch:28},{wch:52},{wch:18},{wch:14},{wch:32},{wch:26},{wch:28}];wsA["!autofilter"]={ref:XLSX.utils.encode_range({s:{r:0,c:0},e:{r:Math.max(arow.length,1),c:ACOLS.length-1}})};XLSX.utils.book_append_sheet(wb,wsA,"Actividades");
   return new Blob([XLSX.write(wb,{bookType:"xlsx",type:"array"})],{type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"})}
 $("#bTpl").onclick=()=>{if(!window.XLSX){toast("No se pudo cargar el generador de Excel. Recarga la página.");return}offer("Plantilla_Procesos_Perra_Suerte.xlsx",buildWorkbook(true),"Plantilla")};
@@ -635,7 +636,7 @@ function buildPDF(){
     const bl=s=>lines(s).map(x=>"• "+x);
     box(0,0,"Recursos",bl(c.recursos));box(1,0,"Actividades principales",p.actividades.map(a=>"• "+a.actividad));box(2,0,"Indicadores",bl(c.indicadores));
     box(0,1,"Proveedores y entradas",[...(lines(c.proveedores).length?["Proveedores:",...bl(c.proveedores)]:[]),"Entradas:",...bl(c.entradas)]);
-    box(1,1,p.nombre,[`Proceso ${t.sing}`,c.objetivo?"Objetivo: "+c.objetivo:"",(c.inicio||c.fin)?`Inicia con: ${c.inicio||"…"}. Termina con: ${c.fin||"…"}.`:"","Responsable: "+(p.resp||"sin asignar")].filter(Boolean),t.pdf);
+    box(1,1,p.nombre,[`Proceso ${t.sing}`,c.objetivo?"Objetivo: "+c.objetivo:"",(c.inicio||c.fin)?`Inicia con: ${c.inicio||"…"}. Termina con: ${c.fin||"…"}.`:"","Responsable: "+(p.resp||"sin asignar"),"Respaldo: "+(p.resp2||"sin asignar")].filter(Boolean),t.pdf);
     box(2,1,"Salidas y clientes",["Salidas:",...bl(c.salidas),...(lines(c.clientes).length?["Clientes:",...bl(c.clientes)]:[])]);
     box(0,2,"Riesgos",bl(c.riesgos));box(1,2,"Requisitos aplicables",bl(c.requisitos));box(2,2,"Documentos y registros",bl(c.documentos));
     const y2=gy+3*(ch+10);doc.setFont("helvetica","bold");doc.setFontSize(8.5);doc.setTextColor(...MUT);doc.text("Interacción:",M,y2+4);doc.setFont("helvetica","normal");doc.setTextColor(...INK);doc.text(doc.splitTextToSize(lines(c.interaccion).join(", ")||"Sin capturar",W-2*M-70).slice(0,2),M+62,y2+4);
@@ -647,8 +648,8 @@ function buildPDF(){
       foot()}});
   // resumen
   if(doc.autoTable){doc.addPage();head("Quién hace qué");const acts=allActs();
-    doc.autoTable({startY:76,margin:{left:M,right:M,bottom:40},head:[["Responsable","Procesos que lidera","Actividades"]],body:equipoAll().filter(r=>S.procesos.some(p=>p.resp===r)||acts.some(x=>x.a.responsable===r)).map(r=>[r,S.procesos.filter(p=>p.resp===r).map(p=>p.nombre).join(", ")||"—",acts.filter(x=>x.a.responsable===r).length]),
-      styles:{font:"helvetica",fontSize:9,cellPadding:6,textColor:INK,lineColor:LINE,lineWidth:.5},headStyles:{fillColor:[46,41,37],textColor:[239,232,220]},columnStyles:{0:{cellWidth:130,fontStyle:"bold"},2:{cellWidth:80,halign:"right"}}});
+    doc.autoTable({startY:76,margin:{left:M,right:M,bottom:40},head:[["Responsable","Procesos que lidera","Respaldo de","Actividades"]],body:equipoAll().filter(r=>S.procesos.some(p=>p.resp===r||p.resp2===r)||acts.some(x=>x.a.responsable===r)).map(r=>[r,S.procesos.filter(p=>p.resp===r).map(p=>p.nombre).join(", ")||"—",S.procesos.filter(p=>p.resp2===r).map(p=>p.nombre).join(", ")||"—",acts.filter(x=>x.a.responsable===r).length]),
+      styles:{font:"helvetica",fontSize:9,cellPadding:6,textColor:INK,lineColor:LINE,lineWidth:.5},headStyles:{fillColor:[46,41,37],textColor:[239,232,220]},columnStyles:{0:{cellWidth:120,fontStyle:"bold"},3:{cellWidth:70,halign:"right"}}});
     foot()}
   return doc}
 $("#bPdf").onclick=()=>{if(!window.jspdf){toast("No se pudo cargar el generador de PDF. Recarga la página.");return}if(!S.procesos.length){toast("Agrega procesos antes de exportar.");return}
